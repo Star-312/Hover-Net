@@ -38,11 +38,19 @@ def check_manual_seed(seed):
         seed: seed to check
 
     """
+    """ 如果未指定手动种子，则选择一个
+    随机种子并告知用户。
+
+    参数:
+        seed: 要检查的种子
+
+    """
     seed = seed or random.randint(1, 10000)
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
+    # ia.random.seed(seed)
     # ia.random.seed(seed)
 
     print("Using manual seed: {seed}".format(seed=seed))
@@ -55,6 +63,12 @@ def check_log_dir(log_dir):
 
     Args:
         log_dir: path to logs
+
+    """
+    """检查日志目录是否存在。
+
+    参数:
+        log_dir: 日志路径
 
     """
     if os.path.isdir(log_dir):
@@ -79,6 +93,10 @@ def get_model_summary(
 ):
     """Reusable utility layers such as pool or upsample will also get printed, but their printed values will
     be corresponding to the last call.
+
+    """
+    """可重用的工具层（如池化或上采样）也会被打印，但它们的打印值将
+    对应于最后一次调用。
 
     """
     if dtypes == None:
@@ -120,35 +138,43 @@ def get_model_summary(
             hooks.append(module.register_forward_hook(hook))
 
     # multiple inputs to the network
+    # 网络的多个输入
     if isinstance(input_size, tuple):
         input_size = [input_size]
 
     # batch_size of 2 for batchnorm
+    # batchnorm 使用 batch_size 为 2
     x = [
         torch.rand(2, *in_size).type(dtype).to(device=device)
         for in_size, dtype in zip(input_size, dtypes)
     ]
 
     # create properties
+    # 创建属性
     summary = OrderedDict()
     hooks = []
 
     # create layer name according to hierachy names
+    # 根据层级名称创建层名
     for name, module in model.named_modules():
         module.name = name
 
     # register hook
+    # 注册钩子
     model.apply(register_hook)
 
     # make a forward pass
+    # 进行一次前向传播
     model(*x)
 
     # aligning name to the left
+    # 将名称左对齐
     max_name_length = len(max(summary.keys(), key=len))
     summary = [(k.ljust(max_name_length), v) for k, v in summary.items()]
     summary = OrderedDict(summary)
 
     # remove these hooks
+    # 移除这些钩子
     for h in hooks:
         h.remove()
 
@@ -163,6 +189,7 @@ def get_model_summary(
     trainable_params = 0
     for layer in summary:
         # input_shape, output_shape, trainable, nb_params
+        # 输入形状、输出形状、可训练、参数量
         line_new = "{:>20}  {:>25} {:>15}".format(
             layer,
             str(summary[layer]["output_shape"]),
@@ -177,12 +204,14 @@ def get_model_summary(
         summary_str += line_new + "\n"
 
     # assume 4 bytes/number (float on cuda).
+    # 假设每个数字 4 字节（cuda 上的 float）。
     total_input_size = abs(
         np.prod(sum(input_size, ())) * batch_size * 4.0 / (1024 ** 2.0)
     )
     total_output_size = abs(
         2.0 * total_output * 4.0 / (1024 ** 2.0)
     )  # x2 for gradients
+    # 梯度 x2
     total_params_size = abs(total_params * 4.0 / (1024 ** 2.0))
     total_size = total_params_size + total_output_size + total_input_size
 

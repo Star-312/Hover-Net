@@ -14,12 +14,14 @@ from config import Config
 ####
 class Net(nn.Module):
     """ A base class provides a common weight initialisation scheme."""
+    """ 提供通用权重初始化方案的基类。"""
 
     def weights_init(self):
         for m in self.modules():
             classname = m.__class__.__name__
 
             # ! Fixed the type checking
+            # ! 修复了类型检查
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
 
@@ -42,6 +44,11 @@ class TFSamepaddingLayer(nn.Module):
     Putting this before any conv layer that need padding
     Assuming kernel has Height == Width for simplicity
     """
+    """与 TensorFlow 的 `same` 填充对齐。
+    
+    将其放在任何需要填充的卷积层之前
+    为简单起见，假设卷积核的高 == 宽
+    """
 
     def __init__(self, ksize, stride):
         super(TFSamepaddingLayer, self).__init__()
@@ -62,8 +69,10 @@ class TFSamepaddingLayer(nn.Module):
             pad_val_end = pad - pad_val_start
             padding = (pad_val_start, pad_val_end, pad_val_start, pad_val_end)
         # print(x.shape, padding)
+        # 打印(x.shape, padding)
         x = F.pad(x, padding, "constant", 0)
         # print(x.shape)
+        # 打印(x.shape)
         return x
 
 
@@ -78,6 +87,15 @@ class DenseBlock(Net):
     Only performs `valid` convolution.
 
     """
+    """Dense Block（密集块）定义见：
+
+    Huang, Gao, Zhuang Liu, Laurens Van Der Maaten, and Kilian Q. Weinberger. 
+    "Densely connected convolutional networks." In Proceedings of the IEEE conference 
+    on computer vision and pattern recognition, pp. 4700-4708. 2017.
+
+    仅执行 `valid` 卷积（无填充）。
+
+    """
 
     def __init__(self, in_ch, unit_ksize, unit_ch, unit_count, split=1):
         super(DenseBlock, self).__init__()
@@ -88,6 +106,7 @@ class DenseBlock(Net):
         self.unit_ch = unit_ch
 
         # ! For inference only so init values for batchnorm may not match tensorflow
+        # ! 仅用于推理，因此 batchnorm 的初始化值可能与 TensorFlow 不一致
         unit_in_ch = in_ch
         self.units = nn.ModuleList()
         for idx in range(unit_count):
@@ -110,6 +129,7 @@ class DenseBlock(Net):
                             ),
                             ("conv1/bn", nn.BatchNorm2d(unit_ch[0], eps=1e-5)),
                             ("conv1/relu", nn.ReLU(inplace=True)),
+                            # ('conv2/pool', TFSamepaddingLayer(ksize=unit_ksize[1], stride=1)),
                             # ('conv2/pool', TFSamepaddingLayer(ksize=unit_ksize[1], stride=1)),
                             (
                                 "conv2",
@@ -160,6 +180,13 @@ class ResidualBlock(Net):
     and pattern recognition, pp. 770-778. 2016.
 
     """
+    """残差块定义见：
+
+    He, Kaiming, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. "Deep residual learning 
+    for image recognition." In Proceedings of the IEEE conference on computer vision 
+    and pattern recognition, pp. 770-778. 2016.
+
+    """
 
     def __init__(self, in_ch, unit_ksize, unit_ch, unit_count, stride=1):
         super(ResidualBlock, self).__init__()
@@ -170,6 +197,7 @@ class ResidualBlock(Net):
         self.unit_ch = unit_ch
 
         # ! For inference only so init values for batchnorm may not match tensorflow
+        # ! 仅用于推理，因此 batchnorm 的初始化值可能与 TensorFlow 不一致
         unit_in_ch = in_ch
         self.units = nn.ModuleList()
         for idx in range(unit_count):
@@ -221,7 +249,9 @@ class ResidualBlock(Net):
                 ),
             ]
             # * has bna to conclude each previous block so
+            # * 每个前一个块都有 bna 来收尾，因此
             # * must not put preact for the first unit of this block
+            # * 本块的第一个单元不能放 preact
             unit_layer = unit_layer if idx != 0 else unit_layer[2:]
             self.units.append(nn.Sequential(OrderedDict(unit_layer)))
             unit_in_ch = unit_ch[-1]
@@ -241,8 +271,11 @@ class ResidualBlock(Net):
         )
 
         # print(self.units[0])
+        # 打印(self.units[0])
         # print(self.units[1])
+        # 打印(self.units[1])
         # exit()
+        # 退出()
 
     def out_ch(self):
         return self.unit_ch[-1]
@@ -272,10 +305,15 @@ class UpSample2x(nn.Module):
     
     Assume input is of NCHW, port FixedUnpooling from TensorPack.
     """
+    """将输入上采样 2 倍。
+    
+    假设输入为 NCHW 格式，从 TensorPack 移植 FixedUnpooling。
+    """
 
     def __init__(self):
         super(UpSample2x, self).__init__()
         # correct way to create constant within module
+        # 在模块内创建常量的正确方式
         self.register_buffer(
             "unpool_mat", torch.from_numpy(np.ones((2, 2), dtype="float32"))
         )
@@ -284,12 +322,19 @@ class UpSample2x(nn.Module):
     def forward(self, x):
         input_shape = list(x.shape)
         # unsqueeze is expand_dims equivalent
+        # unsqueeze 等同于 expand_dims
         # permute is transpose equivalent
+        # permute 等同于 transpose
         # view is reshape equivalent
+        # view 等同于 reshape
         x = x.unsqueeze(-1)  # bchwx1
+        # bchwx1
         mat = self.unpool_mat.unsqueeze(0)  # 1xshxsw
+        # 1xshxsw
         ret = torch.tensordot(x, mat, dims=1)  # bxcxhxwxshxsw
+        # bxcxhxwxshxsw
         ret = ret.permute(0, 1, 2, 4, 3, 5)
         ret = ret.reshape((-1, input_shape[1], input_shape[2] * 2, input_shape[3] * 2))
         return ret
+
 

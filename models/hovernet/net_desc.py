@@ -13,6 +13,7 @@ from .utils import crop_op, crop_to_shape
 ####
 class HoVerNet(Net):
     """Initialise HoVer-Net."""
+    """初始化 HoVer-Net。"""
 
     def __init__(self, input_ch=3, nr_types=None, freeze=False, mode='original'):
         super().__init__()
@@ -30,6 +31,7 @@ class HoVerNet(Net):
             ("relu", nn.ReLU(inplace=True)),
         ]
         if mode == 'fast': # prepend the padding for `fast` mode
+            # 为 `fast` 模式前置填充层
             module_list = [("pad", TFSamepaddingLayer(ksize=7, stride=1))] + module_list
 
         self.conv0 = nn.Sequential(OrderedDict(module_list))
@@ -96,11 +98,13 @@ class HoVerNet(Net):
 
         self.upsample2x = UpSample2x()
         # TODO: pytorch still require the channel eventhough its ignored
+        # TODO: 尽管被忽略，pytorch 仍然需要通道参数
         self.weights_init()
 
     def forward(self, imgs):
 
         imgs = imgs / 255.0  # to 0-1 range to match XY
+        # 归一化到 0-1 范围以匹配 XY
 
         if self.training:
             d0 = self.conv0(imgs)
@@ -121,6 +125,7 @@ class HoVerNet(Net):
             d = [d0, d1, d2, d3]
 
         # TODO: switch to `crop_to_shape` ?
+        # TODO: 切换为 `crop_to_shape`？
         if self.mode == 'original':
             d[0] = crop_op(d[0], [184, 184])
             d[1] = crop_op(d[1], [72, 72])
@@ -150,4 +155,5 @@ def create_model(mode=None, **kwargs):
     if mode not in ['original', 'fast']:
         assert "Unknown Model Mode %s" % mode
     return HoVerNet(mode=mode, **kwargs)
+
 

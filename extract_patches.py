@@ -2,6 +2,10 @@
 
 Patch extraction script.
 """
+"""extract_patches.py
+
+图像块提取脚本。
+"""
 
 import re
 import glob
@@ -17,21 +21,27 @@ from misc.utils import rm_n_mkdir
 from dataset import get_dataset
 
 # -------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------
 if __name__ == "__main__":
 
     # Determines whether to extract type map (only applicable to datasets with class labels).
+    # 决定是否提取类型图（仅适用于有类别标签的数据集）。
     type_classification = True
 
     win_size = [540, 540]
     step_size = [164, 164]
     extract_type = "mirror"  # Choose 'mirror' or 'valid'. 'mirror'- use padding at borders. 'valid'- only extract from valid regions.
+    # 选择 'mirror' 或 'valid'。'mirror'- 在边界处使用填充。'valid'- 仅从有效区域提取。
 
     # Name of dataset - use Kumar, CPM17 or CoNSeP.
+    # 数据集名称 - 使用 Kumar、CPM17 或 CoNSeP。
     # This used to get the specific dataset img and ann loading scheme from dataset.py
+    # 这用于从 dataset.py 中获取特定数据集的图像和标注加载方案
     dataset_name = "consep"
     save_root = "dataset/training_data/%s/" % dataset_name
 
     # a dictionary to specify where the dataset path should be
+    # 用于指定数据集路径位置的字典
     dataset_info = {
         "train": {
             "img": (".png", "dataset/CoNSeP/Train/Images/"),
@@ -61,6 +71,7 @@ if __name__ == "__main__":
         )
         file_list = glob.glob(patterning("%s/*%s" % (ann_dir, ann_ext)))
         file_list.sort()  # ensure same ordering across platform
+        # 确保跨平台排序一致
 
         rm_n_mkdir(out_dir)
 
@@ -78,6 +89,7 @@ if __name__ == "__main__":
             )
 
             # *
+            # *
             img = np.concatenate([img, ann], axis=-1)
             sub_patches = xtractor.extract(img, extract_type)
 
@@ -94,6 +106,7 @@ if __name__ == "__main__":
                 np.save("{0}/{1}_{2:03d}.npy".format(out_dir, base_name, idx), patch)
                 pbar.update()
             pbar.close()
+            # *
             # *
 
             pbarx.update()

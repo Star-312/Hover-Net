@@ -12,14 +12,17 @@ from .utils import get_bounding_box
 ####
 def colorize(ch, vmin, vmax):
     """Will clamp value value outside the provided range to vmax and vmin."""
+    """将超出指定范围的值截断到 vmax 和 vmin。"""
     cmap = plt.get_cmap("jet")
     ch = np.squeeze(ch.astype("float32"))
     vmin = vmin if vmin is not None else ch.min()
     vmax = vmax if vmax is not None else ch.max()
     ch[ch > vmax] = vmax  # clamp value
+    # 截断值
     ch[ch < vmin] = vmin
     ch = (ch - vmin) / (vmax - vmin + 1.0e-16)
     # take RGB from RGBA heat map
+    # 从 RGBA 热力图中提取 RGB
     ch_cmap = (cmap(ch)[..., :3] * 255).astype("uint8")
     return ch_cmap
 
@@ -30,6 +33,11 @@ def random_colors(N, bright=True):
     
     To get visually distinct colors, generate them in HSV space then
     convert to RGB.
+    """
+    """生成随机颜色。
+    
+    为了获得视觉上不同的颜色，在 HSV 空间中生成，然后
+    转换为 RGB。
     """
     brightness = 1.0 if bright else 0.7
     hsv = [(i / N, 1, brightness) for i in range(N)]
@@ -55,10 +63,25 @@ def visualize_instances_map(
     Returns:
         overlay: output image with segmentation overlay as contours
     """
+    """将分割结果作为轮廓叠加在图像上。
+
+    参数:
+        input_image: 输入图像
+        inst_map: 每个对象具有唯一值的实例掩码
+        type_map: 每个类别具有唯一值的类型掩码
+        type_colour: {type : colour} 字典，`type` 从 0-N
+                     `colour` 是 (R, G, B) 元组
+        line_thickness: 轮廓线宽度
+
+    返回:
+        overlay: 带有分割叠加轮廓的输出图像
+    """
     overlay = np.copy((input_image).astype(np.uint8))
 
     inst_list = list(np.unique(inst_map))  # get list of instances
+    # 获取实例列表
     inst_list.remove(0)  # remove background
+    # 移除背景
 
     inst_rng_colors = random_colors(len(inst_list))
     inst_rng_colors = np.array(inst_rng_colors) * 255
@@ -66,6 +89,7 @@ def visualize_instances_map(
 
     for inst_idx, inst_id in enumerate(inst_list):
         inst_map_mask = np.array(inst_map == inst_id, np.uint8)  # get single object
+        # 获取单个对象
         y1, y2, x1, x2 = get_bounding_box(inst_map_mask)
         y1 = y1 - 2 if y1 - 2 >= 0 else y1
         x1 = x1 - 2 if x1 - 2 >= 0 else x1
@@ -76,13 +100,17 @@ def visualize_instances_map(
             inst_map_crop, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
         )
         # only has 1 instance per map, no need to check #contour detected by opencv
+        # 每个图只有 1 个实例，不需要检查 opencv 检测到的轮廓数
         contours_crop = np.squeeze(
             contours_crop[0][0].astype("int32")
         )  # * opencv protocol format may break
+        # * opencv 协议格式可能会出错
         contours_crop += np.asarray([[x1, y1]])  # index correction
+        # 索引校正
         if type_map is not None:
             type_map_crop = type_map[y1:y2, x1:x2]
             type_id = np.unique(type_map_crop).max()  # non-zero
+            # 非零
             inst_colour = type_colour[type_id]
         else:
             inst_colour = (inst_rng_colors[inst_idx]).tolist()
@@ -103,6 +131,16 @@ def visualize_instances_dict(
         type_colour: a dict of {type_id : (type_name, colour)} , 
                      `type_id` is from 0-N and `colour` is a tuple of (R, G, B)
         line_thickness: line thickness of contours
+    """
+    """将分割结果（字典）作为轮廓叠加在图像上。
+
+    参数:
+        input_image: 输入图像
+        inst_dict: 输出预测字典，如本库中定义
+        draw_dot: 为每个质心画一个点
+        type_colour: {type_id : (type_name, colour)} 字典，
+                     `type_id` 从 0-N，`colour` 是 (R, G, B) 元组
+        line_thickness: 轮廓线宽度
     """
     overlay = np.copy((input_image))
 
@@ -136,6 +174,7 @@ def gen_figure(
     colormap=plt.get_cmap("jet"),
 ):
     """Generate figure."""
+    """生成图形。"""
     num_img = len(imgs_list)
     if shape is None:
         ncols = math.ceil(math.sqrt(num_img))
@@ -144,10 +183,12 @@ def gen_figure(
         nrows, ncols = shape
 
     # generate figure
+    # 生成图形
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, sharex=share_ax, sharey=share_ax)
     axes = [axes] if nrows == 1 else axes
 
     # not very elegant
+    # 不太优雅
     idx = 0
     for ax in axes:
         for cell in ax:

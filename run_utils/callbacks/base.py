@@ -27,6 +27,9 @@ class TrackLr(BaseCallbacks):
     """
     Add learning rate to tracking
     """
+    """
+    将学习率添加到跟踪中
+    """
 
     def __init__(self, per_n_epoch=1, per_n_step=None):
         super().__init__()
@@ -35,6 +38,7 @@ class TrackLr(BaseCallbacks):
 
     def run(self, state, event):
         # logging learning rate, decouple into another callback?
+        # 记录学习率，是否解耦到另一个回调？
         run_info = state.run_info
         for net_name, net_info in run_info.items():
             lr = net_info["optimizer"].param_groups[0]["lr"]
@@ -45,12 +49,14 @@ class TrackLr(BaseCallbacks):
 ####
 class ScheduleLr(BaseCallbacks):
     """Trigger all scheduler."""
+    """触发所有调度器。"""
 
     def __init__(self):
         super().__init__()
 
     def run(self, state, event):
         # logging learning rate, decouple into another callback?
+        # 记录学习率，是否解耦到另一个回调？
         run_info = state.run_info
         for net_name, net_info in run_info.items():
             net_info["lr_scheduler"].step()
@@ -75,6 +81,7 @@ class TriggerEngine(BaseCallbacks):
 ####
 class PeriodicSaver(BaseCallbacks):
     """Must declare save dir first in the shared global state of the attached engine."""
+    """必须首先在附加引擎的共享全局状态中声明保存目录。"""
 
     def __init__(self, per_n_epoch=1, per_n_step=None):
         super().__init__()
@@ -86,6 +93,7 @@ class PeriodicSaver(BaseCallbacks):
             return
 
         # TODO: add switch so that only one of [per_n_epoch / per_n_step] can run
+        # TODO: 添加开关，使 [per_n_epoch / per_n_step] 中只有一个可以运行
         if state.curr_epoch % self.per_n_epoch != 0:
             return
 
@@ -104,6 +112,7 @@ class PeriodicSaver(BaseCallbacks):
 ####
 class ConditionalSaver(BaseCallbacks):
     """Must declare save dir first in the shared global state of the attached engine."""
+    """必须首先在附加引擎的共享全局状态中声明保存目录。"""
 
     def __init__(self, metric_name, comparator=">="):
         super().__init__()
@@ -127,6 +136,7 @@ class ConditionalSaver(BaseCallbacks):
             best_value = +float("inf")
 
         # json stat log file, update and overwrite
+        # json 统计日志文件，更新并覆盖
         with open(state.log_info["json_file"]) as json_file:
             json_data = json.load(json_file)
 
@@ -138,10 +148,12 @@ class ConditionalSaver(BaseCallbacks):
         current_value = json_data[str(state.curr_epoch)][self.metric_name]
         if not op_func(current_value, best_value):
             return  # simply return because not satisfy
+            # 不满足条件，直接返回
 
         print(
             state.curr_epoch
         )  # TODO: better way to track which optimal epoch is saved
+        # TODO: 更好的方式来跟踪保存了哪个最优 epoch
         for net_name, net_info in state.run_info.items():
             net_checkpoint = {}
             for key, value in net_info.items():
@@ -172,6 +184,8 @@ class AccumulateRawOutput(BaseCallbacks):
 class ScalarMovingAverage(BaseCallbacks):
     """Calculate the running average for all scalar output of 
     each runstep of the attached RunEngine."""
+    """计算附加 RunEngine 每个 runstep 的所有标量输出的
+    滑动平均值。"""
 
     def __init__(self, alpha=0.95):
         super().__init__()
@@ -180,17 +194,20 @@ class ScalarMovingAverage(BaseCallbacks):
 
     def run(self, state, event):
         # TODO: protocol for dynamic key retrieval for EMA
+        # TODO: EMA 动态键检索协议
         step_output = state.step_output["EMA"]
 
         for key, current_value in step_output.items():
             if key in self.tracking_dict:
                 old_ema_value = self.tracking_dict[key]
                 # calculate the exponential moving average
+                # 计算指数移动平均
                 new_ema_value = (
                     old_ema_value * self.alpha + (1.0 - self.alpha) * current_value
                 )
                 self.tracking_dict[key] = new_ema_value
             else:  # init for variable which appear for the first time
+                # 首次出现的变量初始化
                 new_ema_value = current_value
                 self.tracking_dict[key] = new_ema_value
 
@@ -202,6 +219,7 @@ class ScalarMovingAverage(BaseCallbacks):
 class ProcessAccumulatedRawOutput(BaseCallbacks):
     def __init__(self, proc_func, per_n_epoch=1):
         # TODO: allow dynamically attach specific procesing for `type`
+        # TODO: 允许动态附加 `type` 的特定处理
         super().__init__()
         self.per_n_epoch = per_n_epoch
         self.proc_func = proc_func
@@ -209,9 +227,11 @@ class ProcessAccumulatedRawOutput(BaseCallbacks):
     def run(self, state, event):
         current_epoch = state.curr_epoch
         # if current_epoch % self.per_n_epoch != 0: return
+        # if current_epoch % self.per_n_epoch != 0: return
         raw_data = state.epoch_accumulated_output
         track_dict = self.proc_func(raw_data)
         # update global shared states
+        # 更新全局共享状态
         state.tracked_step_output = track_dict
         return
 
@@ -221,6 +241,7 @@ class VisualizeOutput(BaseCallbacks):
     def __init__(self, proc_func, per_n_epoch=1):
         super().__init__()
         # TODO: option to dump viz per epoch or per n step
+        # TODO: 每个 epoch 或每 n 步导出可视化的选项
         self.per_n_epoch = per_n_epoch
         self.proc_func = proc_func
 

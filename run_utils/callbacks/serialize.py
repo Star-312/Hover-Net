@@ -4,7 +4,9 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 # * syn where to set this
+# * 在哪里设置这个
 # must use 'Agg' to plot out onto image
+# 必须使用 'Agg' 来绘制到图像上
 matplotlib.use("Agg")
 
 ####
@@ -15,6 +17,14 @@ def fig2data(fig, dpi=180):
         fig: a matplotlib figure
     
     Return: a numpy 3D array of RGBA values
+
+    """
+    """将 Matplotlib 图形转换为带有 RGBA 通道的 4D numpy 数组并返回。
+    
+    参数:
+        fig: matplotlib 图形
+    
+    返回: RGBA 值的 numpy 3D 数组
 
     """
     buf = io.BytesIO()
@@ -97,6 +107,36 @@ class _ConfusionMatrix(object):
             http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
 
             """
+            """给定 sklearn 混淆矩阵 (cm)，生成漂亮的图。
+
+            参数:
+                cm:           来自 sklearn.metrics.confusion_matrix 的混淆矩阵
+
+                target_names: 给定分类类别，如 [0, 1, 2]
+                            类别的名称，例如：['high', 'medium', 'low']
+
+                title:        显示在矩阵顶部的文本
+
+                cmap:         从 matplotlib.pyplot.cm 显示的值的渐变
+                            参见 http://matplotlib.org/examples/color/colormaps_reference.html
+                            plt.get_cmap('jet') 或 plt.cm.Blues
+
+                normalize:    如果为 False，绘制原始数字
+                            如果为 True，绘制比例
+
+            用法
+            -----
+            plot_confusion_matrix(cm           = cm,                  # 混淆矩阵由
+                                                                    # sklearn.metrics.confusion_matrix 创建
+                                normalize    = True,                # 显示比例
+                                target_names = y_labels_vals,       # 类名列表
+                                title        = best_estimator_name) # 图表标题
+
+            引用
+            ---------
+            http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
+
+            """
             import matplotlib.pyplot as plt
             import numpy as np
             import itertools
@@ -158,16 +198,19 @@ class _Image(object):
     @staticmethod
     def to_console(value):
         # TODO: add warn for not possible or sthg here
+        # TODO: 在这里添加不可用的警告
         return None
 
     @staticmethod
     def to_json(value):
         # TODO: add warn for not possible or sthg here
+        # TODO: 在这里添加不可用的警告
         return None
 
     @staticmethod
     def to_tensorboard(value):
         # TODO: add method
+        # TODO: 添加方法
         return "image", value
 
 

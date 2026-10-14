@@ -3,6 +3,7 @@ import multiprocessing
 from multiprocessing import Lock, Pool
 
 multiprocessing.set_start_method("spawn", True)  # ! must be at top for VScode debugging
+# ! 必须放在顶部以便 VScode 调试
 import argparse
 import glob
 import json
@@ -53,6 +54,15 @@ def _prepare_patching(img, window_size, mask_size, return_src_top_corner=False):
         return_src_top_corner: whether to return coordiante information for top left corner of img
         
     """
+    """为切片处理准备补丁信息。
+    
+    参数:
+        img: 原始输入图像
+        window_size: 输入补丁大小
+        mask_size: 输出补丁大小
+        return_src_top_corner: 是否返回图像左上角的坐标信息
+        
+    """
 
     win_size = window_size
     msk_size = step_size = mask_size
@@ -76,6 +86,7 @@ def _prepare_patching(img, window_size, mask_size, return_src_top_corner=False):
     img = np.lib.pad(img, ((padt, padb), (padl, padr), (0, 0)), "reflect")
 
     # generating subpatches index from orginal
+    # 从原始图像生成子补丁索引
     coord_y = np.arange(0, last_h, step_size, dtype=np.int32)
     coord_x = np.arange(0, last_w, step_size, dtype=np.int32)
     row_idx = np.arange(0, coord_y.shape[0], dtype=np.int32)
@@ -108,7 +119,18 @@ def _post_process_patches(
         overlay_kwargs: overlay keyword arguments
 
     """
+    """对补丁应用后处理。
+    
+    参数:
+        post_proc_func: 要使用的后处理函数
+        post_proc_kwargs: 后处理函数中使用的关键字参数
+        patch_info: 补丁数据和相关信息
+        image_info: 输入图像数据和相关信息
+        overlay_kwargs: 叠加关键字参数
+
+    """
     # re-assemble the prediction, sort according to the patch location within the original image
+    # 重新组装预测，根据补丁在原始图像中的位置排序
     patch_info = sorted(patch_info, key=lambda x: [x[0][0], x[0][1]])
     patch_info, patch_data = zip(*patch_info)
 
@@ -128,12 +150,17 @@ def _post_process_patches(
         pred_map, (patch_shape[0] * nr_row, patch_shape[1] * nr_col, ch)
     )
     # crop back to original shape
+    # 裁剪回原始形状
     pred_map = np.squeeze(pred_map[: src_shape[0], : src_shape[1]])
 
     # * Implicit protocol
+    # * 隐式协议
     # * a prediction map with instance of ID 1-N
+    # * 具有 ID 1-N 实例的预测图
     # * and a dict contain the instance info, access via its ID
+    # * 以及包含实例信息的字典，通过其 ID 访问
     # * each instance may have type
+    # * 每个实例可能具有类型
     pred_inst, inst_info_dict = post_proc_func(pred_map, **post_proc_kwargs)
 
     overlaid_img = visualize_instances_dict(
@@ -145,20 +172,26 @@ def _post_process_patches(
 
 class InferManager(base.InferManager):
     """Run inference on tiles."""
+    """在切片上运行推理。"""
 
     ####
     def process_file_list(self, run_args):
         """
         Process a single image tile < 5000x5000 in size.
         """
+        """
+        处理单个图像切片，大小 < 5000x5000。
+        """
         for variable, value in run_args.items():
             self.__setattr__(variable, value)
         assert self.mem_usage < 1.0 and self.mem_usage > 0.0
 
         # * depend on the number of samples and their size, this may be less efficient
+        # * 根据样本数量及其大小，这可能效率较低
         patterning = lambda x: re.sub("([\[\]])", "[\\1]", x)
         file_path_list = glob.glob(patterning("%s/*" % self.input_dir))
         file_path_list.sort()  # ensure same order
+        # 确保相同的顺序
         assert len(file_path_list) > 0, 'Not Detected Any Files From Path'
         
         rm_n_mkdir(self.output_dir + '/json/')
@@ -173,10 +206,16 @@ class InferManager(base.InferManager):
             Output format is implicit assumption, taken from `_post_process_patches`
 
             """
+            """后处理回调。
+            
+            输出格式是隐式假设，取自 `_post_process_patches`
+
+            """
             img_name, pred_map, pred_inst, inst_info_dict, overlaid_img = results
 
             nuc_val_list = list(inst_info_dict.values())
             # need singleton to make matlab happy
+            # 需要单例以使 matlab 满意
             nuc_uid_list = np.array(list(inst_info_dict.keys()))[:,None]
             nuc_type_list = np.array([v["type"] for v in nuc_val_list])[:,None]
             nuc_coms_list = np.array([v["centroid"] for v in nuc_val_list])
@@ -188,6 +227,7 @@ class InferManager(base.InferManager):
                 "inst_centroid": nuc_coms_list
             }
             if self.nr_types is None: # matlab does not have None type array
+                # matlab 没有 None 类型数组
                 mat_dict.pop("inst_type", None) 
 
             if self.save_raw_map:
@@ -226,6 +266,7 @@ class InferManager(base.InferManager):
                 if item_counter == nr_expected_items:
                     break
             # do this to ensure the ordering
+            # 这样做是为了确保顺序
             remained_items_list = remained_items_list + items_list
             return detached_items_list, remained_items_list
 
@@ -239,13 +280,19 @@ class InferManager(base.InferManager):
             available_ram = getattr(hardware_stats, "available")
             available_ram = int(available_ram * self.mem_usage)
             # available_ram >> 20 for MB, >> 30 for GB
+            # available_ram >> 20 表示 MB，>> 30 表示 GB
 
             # TODO: this portion looks clunky but seems hard to detach into separate func
+            # TODO: 这部分看起来很笨拙，但似乎很难分离到单独的函数中
 
             # * caching N-files into memory such that their expected (total) memory usage
+            # * 将 N 个文件缓存到内存中，使其预期（总）内存使用量
             # * does not exceed the designated percentage of currently available memory
+            # * 不超过当前可用内存的指定百分比
             # * the expected memory is a factor w.r.t original input file size and
+            # * 预期内存是相对于原始输入文件大小的一个因子，并且
             # * must be manually provided
+            # * 必须手动提供
             file_idx = 0
             use_path_list = []
             cache_image_list = []
@@ -264,10 +311,12 @@ class InferManager(base.InferManager):
                 self_idx = np.full(patch_info.shape[0], file_idx, dtype=np.int32)
                 patch_info = np.concatenate([patch_info, self_idx[:, None]], axis=-1)
                 # ? may be expensive op
+                # ? 可能是昂贵的操作
                 patch_info = np.split(patch_info, patch_info.shape[0], axis=0)
                 patch_info = [np.squeeze(p) for p in patch_info]
 
                 # * this factor=5 is only applicable for HoVerNet
+                # * 这个 factor=5 仅适用于 HoVerNet
                 expected_usage = sys.getsizeof(img) * 5
                 available_ram -= expected_usage
                 if available_ram < 0:
@@ -275,13 +324,16 @@ class InferManager(base.InferManager):
 
                 file_idx += 1
                 # if file_idx == 4: break
+                # 如果 file_idx == 4: 中断
                 use_path_list.append(file_path)
                 cache_image_list.append(img)
                 cache_patch_info_list.extend(patch_info)
                 # TODO: refactor to explicit protocol
+                # TODO: 重构为显式协议
                 cache_image_info_list.append([src_shape, len(patch_info), top_corner])
 
             # * apply neural net on cached data
+            # * 对缓存的数据应用神经网络
             dataset = SerializeFileList(
                 cache_image_list, cache_patch_info_list, self.patch_input_shape
             )
@@ -318,6 +370,7 @@ class InferManager(base.InferManager):
             pbar.close()
 
             # * parallely assemble the processed cache data for each file if possible
+            # * 如果可能，并行组装每个文件的处理后缓存数据
             future_list = []
             for file_idx, file_path in enumerate(use_path_list):
                 image_info = cache_image_info_list[file_idx]
@@ -326,7 +379,9 @@ class InferManager(base.InferManager):
                 )
 
                 # * detach this into func and multiproc dispatch it
+                # * 将其分离到函数中并多进程调度
                 src_pos = image_info[2]  # src top left corner within padded image
+                # 填充图像内的源左上角
                 src_image = cache_image_list[file_idx]
                 src_image = src_image[
                     src_pos[0] : src_pos[0] + image_info[0][0],
@@ -344,6 +399,7 @@ class InferManager(base.InferManager):
                     "nr_types": self.nr_types,
                     "return_centroids": True,
                 }  # dynamicalize this
+                # 动态化这个
 
                 overlay_kwargs = {
                     "draw_dot": self.draw_dot,
@@ -359,10 +415,13 @@ class InferManager(base.InferManager):
                 )
 
                 # dispatch for parallel post-processing
+                # 调度并行后处理
                 if proc_pool is not None:
                     proc_future = proc_pool.submit(_post_process_patches, *func_args)
                     # ! manually poll future and call callback later as there is no guarantee
+                    # ! 手动轮询 future 并稍后调用回调，因为不能保证
                     # ! that the callback is called from main thread
+                    # ! 回调从主线程调用
                     future_list.append(proc_future)
                 else:
                     proc_output = _post_process_patches(*func_args)
@@ -370,14 +429,20 @@ class InferManager(base.InferManager):
 
             if proc_pool is not None:
                 # loop over all to check state a.k.a polling
+                # 遍历所有以检查状态即轮询
                 for future in as_completed(future_list):
                     # TODO: way to retrieve which file crashed ?
+                    # TODO: 检索哪个文件崩溃的方法？
                     # ! silent crash, cancel all and raise error
+                    # ! 静默崩溃，取消所有并抛出错误
                     if future.exception() is not None:
                         log_info("Silent Crash")
                         # ! cancel somehow leads to cascade error later
+                        # ! 取消不知为何会导致后续的级联错误
                         # ! so just poll it then crash once all future
+                        # ! 所以只需轮询它，然后在所有 future 都获取后崩溃一次
                         # ! acquired for now
+                        # ! 现在已获取
                         # for future in future_list:
                         #     future.cancel()
                         # break
@@ -385,4 +450,3 @@ class InferManager(base.InferManager):
                         file_path = proc_callback(future.result())
                         log_info("Done Assembling %s" % file_path)
         return
-

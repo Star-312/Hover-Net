@@ -27,8 +27,10 @@ class InferManager(object):
         self.__load_model()
         self.nr_types = self.method["model_args"]["nr_types"]
         # create type info name and colour
+        # 创建类型信息名称和颜色
 
         # default
+        # 默认
         self.type_info_dict = {
             None: ["no label", [0, 0, 0]],
         }
@@ -39,6 +41,7 @@ class InferManager(object):
                 int(k): (v[0], tuple(v[1])) for k, v in self.type_info_dict.items()
             }
             # availability check
+            # 可用性检查
             for k in range(self.nr_types):
                 if k not in self.type_info_dict:
                     assert False, "Not detect type_id=%d defined in json." % k
@@ -48,6 +51,7 @@ class InferManager(object):
             colour_list = np.arange(self.nr_types, dtype=np.int32)
             colour_list = (cmap(colour_list)[..., :3] * 255).astype(np.uint8)
             # should be compatible out of the box wrt qupath
+            # 应该与 qupath 开箱即用兼容
             self.type_info_dict = {
                 k: (str(k), tuple(v)) for k, v in enumerate(colour_list)
             }
@@ -56,6 +60,10 @@ class InferManager(object):
     def __load_model(self):
         """Create the model, load the checkpoint and define
         associated run steps to process each data batch.
+        
+        """
+        """创建模型，加载检查点并定义
+        处理每个数据批次的相关运行步骤。
         
         """
         model_desc = import_module("models.hovernet.net_desc")
@@ -83,12 +91,14 @@ class InferManager(object):
             new_inst_info = {}
             for info_name, info_value in inst_info.items():
                 # convert to jsonable
+                # 转换为可序列化的 json 格式
                 if isinstance(info_value, np.ndarray):
                     info_value = info_value.tolist()
                 new_inst_info[info_name] = info_value
             new_dict[int(inst_id)] = new_inst_info
 
         json_dict = {"mag": mag, "nuc": new_dict}  # to sync the format protocol
+        # 同步格式协议
         with open(path, "w") as handle:
             json.dump(json_dict, handle)
         return new_dict

@@ -4,6 +4,12 @@ Used to convert output to a format that can be used for visualisaton with QuPath
 Note, this is only used for tile segmentation results; not WSI.
 
 """
+"""convert_format.py.
+
+用于将输出转换为可与 QuPath 配合可视化的格式。
+注意，这仅用于图像块分割结果；不用于 WSI（全切片图像）。
+
+"""
 
 import os
 import re
@@ -19,6 +25,9 @@ from misc.utils import rm_n_mkdir, mkdir
 def to_qupath(file_path, nuc_pos_list, nuc_type_list, type_info_dict):
     """
     For QuPath v0.2.3
+    """
+    """
+    适用于 QuPath v0.2.3
     """
 
     def rgb2int(rgb):
@@ -38,6 +47,7 @@ def to_qupath(file_path, nuc_pos_list, nuc_type_list, type_info_dict):
             type_name = type_info_dict[nuc_type][0]
             type_color = type_info_dict[nuc_type][1]
             type_color = rgb2int(type_color)  # color in qupath format
+            # QuPath 格式的颜色
             fptr.write(
                 "{x}\t{y}\t{type_class}\t{type_name}\t{type_color}\n".format(
                     x=nuc_pos[0],
@@ -54,17 +64,25 @@ def to_qupath(file_path, nuc_pos_list, nuc_type_list, type_info_dict):
 if __name__ == "__main__":
     target_format = "qupath"
     # to rescale the coordinate set to match with lv0 mag of the wsi
+    # 缩放坐标集以匹配 WSI 的 0 级放大倍数
     scale_factor = 1.0
     root_dir = "dataset/dummy/out/"
 
     # to define the name, and color conversion code for each target format
+    # 为每种目标格式定义名称和颜色转换代码
     type_info_dict = {
         0: ("nolabe", (0, 0, 0)),  # no label
+        # 无标签
         1: ("neopla", (255, 0, 0)),  # neoplastic
+        # 肿瘤性
         2: ("inflam", (0, 255, 0)),  # inflamm
+        # 炎症
         3: ("connec", (0, 0, 255)),  # connective
+        # 结缔组织
         4: ("necros", (255, 255, 0)),  # dead
+        # 坏死
         5: ("no-neo", (255, 165, 0)),  # non-neoplastic epithelial
+        # 非肿瘤上皮
     }
 
     patterning = lambda x: re.sub("([\[\]])", "[\\1]", x)
@@ -84,6 +102,7 @@ if __name__ == "__main__":
             info_dict = json.load(handle)["nuc"]
 
         # from json to array
+        # 从 json 转换为数组
         new_info_dict = {}
         for inst_id, inst_info in info_dict.items():
             new_inst_info = {}

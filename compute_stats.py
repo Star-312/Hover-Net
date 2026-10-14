@@ -36,51 +36,80 @@ def run_nuclei_type_stat(pred_dir, true_dir, type_uid_list=None, exhaustive=True
                      for instance types
                      
     """
+    """GT 必须对实例位置（检测）进行完整标注。
+
+    参数:
+        true_dir, pred_dir: 包含每张图像 .mat 标注的目录。
+                            每个 .mat 必须包含：
+                    --`inst_centroid`: Nx2，包含 N 个实例的质心坐标 (X, Y)
+                    --`inst_type`    : Nx1：每个索引处对应实例的类型
+                    `inst_centroid` 和 `inst_type` 必须对齐，且每个索引必须对应同一个实例
+        type_uid_list : 需要计算分数的细胞核类型 ID 列表。
+                        默认为 `None`，表示 GT 中可用的细胞核类型。
+        exhaustive : 标志位，指示 GT 是否对实例类型进行了完整标注
+                     
+    """
     file_list = glob.glob(pred_dir + "*.mat")
     file_list.sort()  # ensure same order [1]
+    # 确保顺序一致 [1]
 
     paired_all = []  # unique matched index pair
+    # 唯一匹配的索引对
     unpaired_true_all = []  # the index must exist in `true_inst_type_all` and unique
+    # 索引必须存在于 `true_inst_type_all` 中且唯一
     unpaired_pred_all = []  # the index must exist in `pred_inst_type_all` and unique
+    # 索引必须存在于 `pred_inst_type_all` 中且唯一
     true_inst_type_all = []  # each index is 1 independent data point
+    # 每个索引是 1 个独立的数据点
     pred_inst_type_all = []  # each index is 1 independent data point
+    # 每个索引是 1 个独立的数据点
     for file_idx, filename in enumerate(file_list[:]):
         filename = os.path.basename(filename)
         basename = filename.split(".")[0]
 
         true_info = sio.loadmat(os.path.join(true_dir, basename + ".mat"))
         # dont squeeze, may be 1 instance exist
+        # 不要 squeeze，可能只有 1 个实例
         true_centroid = (true_info["inst_centroid"]).astype("float32")
         true_inst_type = (true_info["inst_type"]).astype("int32")
 
         if true_centroid.shape[0] != 0:
             true_inst_type = true_inst_type[:, 0]
         else:  # no instance at all
+            # 完全没有实例
             true_centroid = np.array([[0, 0]])
             true_inst_type = np.array([0])
 
         # * for converting the GT type in CoNSeP
+        # * 用于转换 CoNSeP 中的 GT 类型
         # true_inst_type[(true_inst_type == 3) | (true_inst_type == 4)] = 3
+        # true_inst_type[(true_inst_type == 3) | (true_inst_type == 4)] = 3
+        # true_inst_type[(true_inst_type == 5) | (true_inst_type == 6) | (true_inst_type == 7)] = 4
         # true_inst_type[(true_inst_type == 5) | (true_inst_type == 6) | (true_inst_type == 7)] = 4
 
         pred_info = sio.loadmat(os.path.join(pred_dir, basename + ".mat"))
         # dont squeeze, may be 1 instance exist
+        # 不要 squeeze，可能只有 1 个实例
         pred_centroid = (pred_info["inst_centroid"]).astype("float32")
         pred_inst_type = (pred_info["inst_type"]).astype("int32")
 
         if pred_centroid.shape[0] != 0:
             pred_inst_type = pred_inst_type[:, 0]
         else:  # no instance at all
+            # 完全没有实例
             pred_centroid = np.array([[0, 0]])
             pred_inst_type = np.array([0])
 
         # ! if take longer than 1min for 1000 vs 1000 pairing, sthg is wrong with coord
+        # ! 如果 1000 对 1000 的配对耗时超过 1 分钟，坐标肯定有问题
         paired, unpaired_true, unpaired_pred = pair_coordinates(
             true_centroid, pred_centroid, 12
         )
 
         # * Aggreate information
+        # * 汇总信息
         # get the offset as each index represent 1 independent instance
+        # 获取偏移量，因为每个索引代表 1 个独立实例
         true_idx_offset = (
             true_idx_offset + true_inst_type_all[-1].shape[0] if file_idx != 0 else 0
         )
@@ -91,7 +120,9 @@ def run_nuclei_type_stat(pred_dir, true_dir, type_uid_list=None, exhaustive=True
         pred_inst_type_all.append(pred_inst_type)
 
         # increment the pairing index statistic
+        # 增加配对索引统计量
         if paired.shape[0] != 0:  # ! sanity
+            # ! 完整性检查
             paired[:, 0] += true_idx_offset
             paired[:, 1] += pred_idx_offset
             paired_all.append(paired)
@@ -141,7 +172,9 @@ def run_nuclei_type_stat(pred_dir, true_dir, type_uid_list=None, exhaustive=True
         return f1_type
 
     # overall
+    # 总体
     # * quite meaningless for not exhaustive annotated dataset
+    # * 对于非完整标注的数据集来说意义不大
     w = [1, 1]
     tp_d = paired_pred_type.shape[0]
     fp_d = unpaired_pred_type.shape[0]
@@ -181,10 +214,12 @@ def run_nuclei_type_stat(pred_dir, true_dir, type_uid_list=None, exhaustive=True
 
 def run_nuclei_inst_stat(pred_dir, true_dir, print_img_stats=False, ext=".mat"):
     # print stats of each image
+    # 打印每张图像的统计信息
     print(pred_dir)
 
     file_list = glob.glob("%s/*%s" % (pred_dir, ext))
     file_list.sort()  # ensure same order
+    # 确保顺序一致
 
     metrics = [[], [], [], [], [], []]
     for filename in file_list[:]:
@@ -198,6 +233,7 @@ def run_nuclei_inst_stat(pred_dir, true_dir, print_img_stats=False, ext=".mat"):
         pred = (pred["inst_map"]).astype("int32")
 
         # to ensure that the instance numbering is contiguous
+        # 确保实例编号是连续的
         pred = remap_label(pred, by_size=False)
         true = remap_label(true, by_size=False)
 
@@ -205,8 +241,11 @@ def run_nuclei_inst_stat(pred_dir, true_dir, print_img_stats=False, ext=".mat"):
         metrics[0].append(get_dice_1(true, pred))
         metrics[1].append(get_fast_aji(true, pred))
         metrics[2].append(pq_info[0])  # dq
+        # 分割质量
         metrics[3].append(pq_info[1])  # sq
+        # 形状质量
         metrics[4].append(pq_info[2])  # pq
+        # 聚合预测
         metrics[5].append(get_fast_aji_plus(true, pred))
 
         if print_img_stats:
@@ -236,9 +275,11 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--pred_dir", help="point to output dir", nargs="?", default="", const=""
+        # 指向输出目录
     )
     parser.add_argument(
         "--true_dir", help="point to ground truth dir", nargs="?", default="", const=""
+        # 指向真实标注目录
     )
     args = parser.parse_args()
 

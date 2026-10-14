@@ -11,6 +11,7 @@ from collections import OrderedDict
 ####
 def train_step(batch_data, run_info):
     # TODO: synchronize the attach protocol
+    # TODO: 同步附加协议
     run_info, state_info = run_info
     loss_func_dict = {
         "bce": xentropy_loss,
@@ -19,6 +20,7 @@ def train_step(batch_data, run_info):
         "msge": msge_loss,
     }
     # use 'ema' to add for EMA calculation, must be scalar!
+    # 使用 'ema' 来计算 EMA，必须是标量！
     result_dict = {"EMA": {}}
     track_value = lambda name, value: result_dict["EMA"].update({name: value})
 
@@ -32,9 +34,11 @@ def train_step(batch_data, run_info):
     true_hv = batch_data["hv_map"]
 
     imgs = imgs.to("cuda").type(torch.float32)  # to NCHW
+    # 转换为 NCHW 格式
     imgs = imgs.permute(0, 3, 1, 2).contiguous()
 
     # HWC
+    # HWC 格式
     true_np = true_np.to("cuda").type(torch.int64)
     true_hv = true_hv.to("cuda").type(torch.float32)
 
@@ -54,6 +58,7 @@ def train_step(batch_data, run_info):
     ####
     model.train()
     model.zero_grad()  # not rnn so not accumulate
+    # 不是 RNN，因此不累积梯度
 
     pred_dict = model(imgs)
     pred_dict = OrderedDict(
@@ -78,19 +83,24 @@ def train_step(batch_data, run_info):
 
     track_value("overall_loss", loss.cpu().item())
     # * gradient update
+    # * 梯度更新
 
+    # torch.set_printoptions(precision=10)
     # torch.set_printoptions(precision=10)
     loss.backward()
     optimizer.step()
     ####
 
     # pick 2 random sample from the batch for visualization
+    # 从批次中随机选取 2 个样本进行可视化
     sample_indices = torch.randint(0, true_np.shape[0], (2,))
 
     imgs = (imgs[sample_indices]).byte()  # to uint8
+    # 转换为 uint8
     imgs = imgs.permute(0, 2, 3, 1).contiguous().cpu().numpy()
 
     pred_dict["np"] = pred_dict["np"][..., 1]  # return pos only
+    # 只返回正类
     pred_dict = {
         k: v[sample_indices].detach().cpu().numpy() for k, v in pred_dict.items()
     }
@@ -101,7 +111,9 @@ def train_step(batch_data, run_info):
     }
 
     # * Its up to user to define the protocol to process the raw output per step!
+    # * 由用户定义每步处理原始输出的协议！
     result_dict["raw"] = {  # protocol for contents exchange within `raw`
+        # `raw` 内内容交换的协议
         "img": imgs,
         "np": (true_dict["np"], pred_dict["np"]),
         "hv": (true_dict["hv"], pred_dict["hv"]),
@@ -115,6 +127,7 @@ def valid_step(batch_data, run_info):
     ####
     model = run_info["net"]["desc"]
     model.eval()  # infer mode
+    # 推理模式
 
     ####
     imgs = batch_data["img"]
@@ -122,9 +135,11 @@ def valid_step(batch_data, run_info):
     true_hv = batch_data["hv_map"]
 
     imgs_gpu = imgs.to("cuda").type(torch.float32)  # to NCHW
+    # 转换为 NCHW 格式
     imgs_gpu = imgs_gpu.permute(0, 3, 1, 2).contiguous()
 
     # HWC
+    # HWC 格式
     true_np = torch.squeeze(true_np).type(torch.int64)
     true_hv = torch.squeeze(true_hv).type(torch.float32)
 
@@ -140,6 +155,7 @@ def valid_step(batch_data, run_info):
 
     # --------------------------------------------------------------
     with torch.no_grad():  # dont compute gradient
+        # 不计算梯度
         pred_dict = model(imgs_gpu)
         pred_dict = OrderedDict(
             [[k, v.permute(0, 2, 3, 1).contiguous()] for k, v in pred_dict.items()]
@@ -152,7 +168,9 @@ def valid_step(batch_data, run_info):
             pred_dict["tp"] = type_map
 
     # * Its up to user to define the protocol to process the raw output per step!
+    # * 由用户定义每步处理原始输出的协议！
     result_dict = {  # protocol for contents exchange within `raw`
+        # `raw` 内内容交换的协议
         "raw": {
             "imgs": imgs.numpy(),
             "true_np": true_dict["np"].numpy(),
@@ -174,13 +192,16 @@ def infer_step(batch_data, model):
     patch_imgs = batch_data
 
     patch_imgs_gpu = patch_imgs.to("cuda").type(torch.float32)  # to NCHW
+    # 转换为 NCHW 格式
     patch_imgs_gpu = patch_imgs_gpu.permute(0, 3, 1, 2).contiguous()
 
     ####
     model.eval()  # infer mode
+    # 推理模式
 
     # --------------------------------------------------------------
     with torch.no_grad():  # dont compute gradient
+        # 不计算梯度
         pred_dict = model(patch_imgs_gpu)
         pred_dict = OrderedDict(
             [[k, v.permute(0, 2, 3, 1).contiguous()] for k, v in pred_dict.items()]
@@ -194,6 +215,7 @@ def infer_step(batch_data, model):
         pred_output = torch.cat(list(pred_dict.values()), -1)
 
     # * Its up to user to define the protocol to process the raw output per step!
+    # * 由用户定义每步处理原始输出的协议！
     return pred_output.cpu().numpy()
 
 
@@ -202,6 +224,10 @@ def viz_step_output(raw_data, nr_types=None):
     """
     `raw_data` will be implicitly provided in the similar format as the 
     return dict from train/valid step, but may have been accumulated across N running step
+    """
+    """
+    `raw_data` 将以与训练/验证步骤返回字典类似的格式隐式提供，
+    但可能已经在 N 个运行步骤中累积
     """
 
     imgs = raw_data["img"]
@@ -219,31 +245,41 @@ def viz_step_output(raw_data, nr_types=None):
         """
         Will clamp value value outside the provided range to vmax and vmin
         """
+        """
+        将超出指定范围的值截断到 vmax 和 vmin
+        """
         ch = np.squeeze(ch.astype("float32"))
         ch[ch > vmax] = vmax  # clamp value
+        # 截断值
         ch[ch < vmin] = vmin
         ch = (ch - vmin) / (vmax - vmin + 1.0e-16)
         # take RGB from RGBA heat map
+        # 从 RGBA 热力图中提取 RGB
         ch_cmap = (cmap(ch)[..., :3] * 255).astype("uint8")
+        # ch_cmap = center_pad_to_shape(ch_cmap, aligned_shape)
         # ch_cmap = center_pad_to_shape(ch_cmap, aligned_shape)
         return ch_cmap
 
     viz_list = []
     for idx in range(imgs.shape[0]):
         # img = center_pad_to_shape(imgs[idx], aligned_shape)
+        # img = center_pad_to_shape(imgs[idx], aligned_shape)
         img = cropping_center(imgs[idx], aligned_shape)
 
         true_viz_list = [img]
         # cmap may randomly fails if of other types
+        # 如果是其他类型，cmap 可能随机失败
         true_viz_list.append(colorize(true_np[idx], 0, 1))
         true_viz_list.append(colorize(true_hv[idx][..., 0], -1, 1))
         true_viz_list.append(colorize(true_hv[idx][..., 1], -1, 1))
         if nr_types is not None:  # TODO: a way to pass through external info
+            # TODO: 传递外部信息的方式
             true_viz_list.append(colorize(true_tp[idx], 0, nr_types))
         true_viz_list = np.concatenate(true_viz_list, axis=1)
 
         pred_viz_list = [img]
         # cmap may randomly fails if of other types
+        # 如果是其他类型，cmap 可能随机失败
         pred_viz_list.append(colorize(pred_np[idx], 0, 1))
         pred_viz_list.append(colorize(pred_hv[idx][..., 0], -1, 1))
         pred_viz_list.append(colorize(pred_hv[idx][..., 1], -1, 1))
@@ -262,6 +298,7 @@ from itertools import chain
 
 def proc_valid_step_output(raw_data, nr_types=None):
     # TODO: add auto populate from main state track list
+    # TODO: 从主状态跟踪列表自动填充
     track_dict = {"scalar": {}, "image": {}}
 
     def track_value(name, value, vtype):
@@ -295,6 +332,7 @@ def proc_valid_step_output(raw_data, nr_types=None):
     track_value("np_dice", dice_np, "scalar")
 
     # * TP statistic
+    # * TP 统计
     if nr_types is not None:
         pred_tp = raw_data["pred_tp"]
         true_tp = raw_data["true_tp"]
@@ -311,6 +349,7 @@ def proc_valid_step_output(raw_data, nr_types=None):
             track_value("tp_dice_%d" % type_id, dice_tp, "scalar")
 
     # * HV regression statistic
+    # * HV 回归统计
     pred_hv = raw_data["pred_hv"]
     true_hv = raw_data["true_hv"]
 
@@ -324,6 +363,7 @@ def proc_valid_step_output(raw_data, nr_types=None):
     mse = over_squared_error / nr_pixels
     track_value("hv_mse", mse, "scalar")
 
+    # *
     # *
     imgs = raw_data["imgs"]
     selected_idx = np.random.randint(0, len(imgs), size=(8,)).tolist()

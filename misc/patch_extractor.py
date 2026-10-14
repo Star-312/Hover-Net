@@ -27,6 +27,23 @@ class PatchExtractor(object):
         >>> patches = xtractor.extract(img, 'mirror')
 
     """
+    """提取器，用于生成带或不带填充的图像块。
+    开启调试模式查看具体过程。
+
+    参数:
+        x         : 输入图像，应为 HWC 形状
+        win_size  : (h, w) 元组
+        step_size : (h, w) 元组
+        debug     : 查看过程的标志
+    返回:
+        子图像块列表，每个图像块的 dtype 与 x 相同
+
+    示例:
+        >>> xtractor = PatchExtractor((450, 450), (120, 120))
+        >>> img = np.full([1200, 1200, 3], 255, np.uint8)
+        >>> patches = xtractor.extract(img, 'mirror')
+
+    """
 
     def __init__(self, win_size, step_size, debug=False):
 
@@ -71,6 +88,20 @@ class PatchExtractor(object):
             a list of sub patches, each patch is same dtype as x
 
         """
+        """提取不带填充的图像块，仅在 win_size > step_size 时有效。
+        
+        注意：为了处理边界处的剩余部分（即从左到右、从上到下滑动时放不下的部分），
+        我们翻转滑动方向，然后从右/底边开始提取 1 个图像块。
+        右下角会额外提取 1 个图像块。
+
+        参数:
+            x         : 输入图像，应为 HWC 形状
+            win_size  : (h, w) 元组
+            step_size : (h, w) 元组
+        返回:
+            子图像块列表，每个图像块的 dtype 与 x 相同
+
+        """
         im_h = x.shape[0]
         im_w = x.shape[1]
 
@@ -85,11 +116,13 @@ class PatchExtractor(object):
 
         sub_patches = []
         #### Deal with valid block
+        #### 处理有效块
         for row in range(0, h_last, self.step_size[0]):
             for col in range(0, w_last, self.step_size[1]):
                 win = self.__get_patch(x, (row, col))
                 sub_patches.append(win)
         #### Deal with edge case
+        #### 处理边界情况
         if h_flag:
             row = im_h - self.win_size[0]
             for col in range(0, w_last, self.step_size[1]):
@@ -117,6 +150,18 @@ class PatchExtractor(object):
             step_size : a tuple of (h, w)
         Return:
             a list of sub patches, each patch is same dtype as x
+            
+        """
+        """用镜像填充边界来提取图像块，使得每个图像块的
+        中心区域始终在原始（未填充）图像内，同时所有图像块的
+        中心区域覆盖整个原始图像。
+
+        参数:
+            x         : 输入图像，应为 HWC 形状
+            win_size  : (h, w) 元组
+            step_size : (h, w) 元组
+        返回:
+            子图像块列表，每个图像块的 dtype 与 x 相同
             
         """
         diff_h = self.win_size[0] - self.step_size[0]
@@ -148,6 +193,7 @@ class PatchExtractor(object):
 
 if __name__ == "__main__":
     # toy example for debug
+    # 调试用的小例子
     # 355x355, 480x480
     xtractor = PatchExtractor((450, 450), (120, 120), debug=True)
     a = np.full([1200, 1200, 3], 255, np.uint8)

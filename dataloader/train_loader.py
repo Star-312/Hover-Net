@@ -37,8 +37,19 @@ class FileLoader(torch.utils.data.Dataset):
         mode: 'train' or 'valid'
         
     """
+    """数据加载器。从文件列表加载图像，并使用 albumentation 库进行数据增强。
+    数据增强后，生成水平和垂直距离图。
+
+    参数:
+        file_list: 要加载的文件名列表
+        input_shape: 输入的形状 [h,w] - 在 config.py 中定义
+        mask_shape: 输出的形状 [h,w] - 在 config.py 中定义
+        mode: 'train'（训练）或 'valid'（验证）
+        
+    """
 
     # TODO: doc string
+    # TODO: 文档字符串
 
     def __init__(
         self,
@@ -78,8 +89,11 @@ class FileLoader(torch.utils.data.Dataset):
         data = np.load(path)
 
         # split stacked channel into image and label
+        # 将堆叠的通道拆分为图像和标签
         img = (data[..., :3]).astype("uint8")  # RGB images
+        # RGB 图像
         ann = (data[..., 3:]).astype("int32")  # instance ID map and type map
+        # 实例 ID 图和类型图
 
         if self.shape_augs is not None:
             shape_augs = self.shape_augs.to_deterministic()
@@ -94,13 +108,16 @@ class FileLoader(torch.utils.data.Dataset):
         feed_dict = {"img": img}
 
         inst_map = ann[..., 0]  # HW1 -> HW
+        # HW1 -> HW
         if self.with_type:
             type_map = (ann[..., 1]).copy()
             type_map = cropping_center(type_map, self.mask_shape)
             #type_map[type_map == 5] = 1  # merge neoplastic and non-neoplastic
+            #type_map[type_map == 5] = 1  # 合并肿瘤性和非肿瘤性
             feed_dict["tp_map"] = type_map
 
         # TODO: document hard coded assumption about #input
+        # TODO: 记录关于 #input 的硬编码假设
         target_dict = self.target_gen_func(
             inst_map, self.mask_shape, **self.target_gen_kwargs
         )
@@ -112,24 +129,38 @@ class FileLoader(torch.utils.data.Dataset):
         if mode == "train":
             shape_augs = [
                 # * order = ``0`` -> ``cv2.INTER_NEAREST``
+                # * order = ``0`` -> ``cv2.INTER_NEAREST``（最近邻插值）
                 # * order = ``1`` -> ``cv2.INTER_LINEAR``
+                # * order = ``1`` -> ``cv2.INTER_LINEAR``（双线性插值）
                 # * order = ``2`` -> ``cv2.INTER_CUBIC``
+                # * order = ``2`` -> ``cv2.INTER_CUBIC``（双三次插值）
                 # * order = ``3`` -> ``cv2.INTER_CUBIC``
+                # * order = ``3`` -> ``cv2.INTER_CUBIC``（双三次插值）
                 # * order = ``4`` -> ``cv2.INTER_CUBIC``
+                # * order = ``4`` -> ``cv2.INTER_CUBIC``（双三次插值）
                 # ! for pannuke v0, no rotation or translation, just flip to avoid mirror padding
+                # ! 对于 pannuke v0，不进行旋转或平移，仅使用翻转以避免镜像填充
                 iaa.Affine(
                     # scale images to 80-120% of their size, individually per axis
+                    # 将图像缩放到其大小的 80-120%，每个轴单独缩放
                     scale={"x": (0.8, 1.2), "y": (0.8, 1.2)},
                     # translate by -A to +A percent (per axis)
+                    # 平移 -A 到 +A 百分比（每个轴）
                     translate_percent={"x": (-0.01, 0.01), "y": (-0.01, 0.01)},
                     shear=(-5, 5),  # shear by -5 to +5 degrees
+                    # 剪切 -5 到 +5 度
                     rotate=(-179, 179),  # rotate by -179 to +179 degrees
+                    # 旋转 -179 到 +179 度
                     order=0,  # use nearest neighbour
+                    # 使用最近邻插值
                     backend="cv2",  # opencv for fast processing
+                    # 使用 opencv 进行快速处理
                     seed=rng,
                 ),
                 # set position to 'center' for center crop
+                # 将位置设为 'center' 进行中心裁剪
                 # else 'uniform' for random crop
+                # 否则设为 'uniform' 进行随机裁剪
                 iaa.CropToFixedSize(
                     self.input_shape[0], self.input_shape[1], position="center"
                 ),
@@ -184,7 +215,9 @@ class FileLoader(torch.utils.data.Dataset):
         elif mode == "valid":
             shape_augs = [
                 # set position to 'center' for center crop
+                # 将位置设为 'center' 进行中心裁剪
                 # else 'uniform' for random crop
+                # 否则设为 'uniform' 进行随机裁剪
                 iaa.CropToFixedSize(
                     self.input_shape[0], self.input_shape[1], position="center"
                 )

@@ -10,6 +10,11 @@ class __AbstractDataset(object):
     their images and annotations.
     
     """
+    """后续类接口的抽象基类。
+    核心思想是封装每个数据集如何解析
+    其图像和标注。
+    
+    """
 
     def load_img(self, path):
         raise NotImplementedError
@@ -27,12 +32,20 @@ class __Kumar(__AbstractDataset):
     computational pathology." IEEE transactions on medical imaging 36, no. 7 (2017): 1550-1560.
 
     """
+    """定义 Kumar 数据集，原始论文出处：
+
+    Kumar, Neeraj, Ruchika Verma, Sanuj Sharma, Surabhi Bhargava, Abhishek Vahadane, 
+    and Amit Sethi. "A dataset and a technique for generalized nuclear segmentation for 
+    computational pathology." IEEE transactions on medical imaging 36, no. 7 (2017): 1550-1560.
+
+    """
 
     def load_img(self, path):
         return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
 
     def load_ann(self, path, with_type=False):
         # assumes that ann is HxW
+        # 假设标注是 HxW 的格式
         assert not with_type, "Not support"
         ann_inst = sio.loadmat(path)["inst_map"]
         ann_inst = ann_inst.astype("int32")
@@ -49,6 +62,13 @@ class __CPM17(__AbstractDataset):
     of digital microscopy tissue images." Frontiers in bioengineering and biotechnology 7 (2019).
 
     """
+    """定义 CPM 2017 数据集，原始论文出处：
+
+    Vu, Quoc Dang, Simon, Graham, Tahsin Kurc, Minh Nguyen Nhat To, Muhammad Shaban, 
+    Talha Qaiser, Navid Alemi Koohbanani et al. "Methods for segmentation and classification 
+    of digital microscopy tissue images." Frontiers in bioengineering and biotechnology 7 (2019).
+
+    """
 
     def load_img(self, path):
         return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
@@ -56,6 +76,7 @@ class __CPM17(__AbstractDataset):
     def load_ann(self, path, with_type=False):
         assert not with_type, "Not support"
         # assumes that ann is HxW
+        # 假设标注是 HxW 的格式
         ann_inst = sio.loadmat(path)["inst_map"]
         ann_inst = ann_inst.astype("int32")
         ann = np.expand_dims(ann_inst, -1)
@@ -71,18 +92,28 @@ class __CoNSeP(__AbstractDataset):
     multi-tissue histology images." Medical Image Analysis 58 (2019): 101563
     
     """
+    """定义 CoNSeP 数据集，原始论文出处：
+
+    Graham, Simon, Quoc Dang Vu, Shan E. Ahmed Raza, Ayesha Azam, Yee Wah Tsang, Jin Tae Kwak, 
+    and Nasir Rajpoot. "Hover-Net: Simultaneous segmentation and classification of nuclei in 
+    multi-tissue histology images." Medical Image Analysis 58 (2019): 101563
+    
+    """
 
     def load_img(self, path):
         return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
 
     def load_ann(self, path, with_type=False):
         # assumes that ann is HxW
+        # 假设标注是 HxW 的格式
         ann_inst = sio.loadmat(path)["inst_map"]
         if with_type:
             ann_type = sio.loadmat(path)["type_map"]
 
             # merge classes for CoNSeP (in paper we only utilise 3 nuclei classes and background)
+            # 为 CoNSeP 合并类别（论文中我们只使用 3 个细胞核类别和背景）
             # If own dataset is used, then the below may need to be modified
+            # 如果使用自己的数据集，以下内容可能需要修改
             ann_type[(ann_type == 3) | (ann_type == 4)] = 3
             ann_type[(ann_type == 5) | (ann_type == 6) | (ann_type == 7)] = 4
 
@@ -98,6 +129,7 @@ class __CoNSeP(__AbstractDataset):
 ####
 def get_dataset(name):
     """Return a pre-defined dataset object associated with `name`."""
+    """返回与 `name` 关联的预定义数据集对象。"""
     name_dict = {
         "kumar": lambda: __Kumar(),
         "cpm17": lambda: __CPM17(),

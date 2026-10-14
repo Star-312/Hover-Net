@@ -27,6 +27,35 @@ Two command mode are `tile` and `wsi` to enter corresponding inference mode
 
 Use `run_infer.py <command> --help` to show their options and usage.
 """
+"""run_infer.py
+
+用法:
+  run_infer.py [选项] [--help] <命令> [<参数>...]
+  run_infer.py --version
+  run_infer.py (-h | --help)
+
+选项:
+  -h --help                   显示此帮助信息。
+  --version                   显示版本号。
+
+  --gpu=<id>                  GPU 列表。[默认: 0]
+  --nr_types=<n>              要预测的细胞核类型数量。[默认: 0]
+  --type_info_path=<path>     JSON 文件路径，定义类型 ID、类型名称和叠加颜色之间的映射。
+                              [默认: '']
+
+  --model_path=<path>         已保存检查点的路径。
+  --model_mode=<mode>         原始 HoVer-Net 或用于 PanNuke 和 MoNuSAC 的精简版本，
+                              'original' 或 'fast'。[默认: fast]
+  --nr_inference_workers=<n>  推理时的 worker 数量。[默认: 8]
+  --nr_post_proc_workers=<n>  后处理时的 worker 数量。[默认: 16]
+  --batch_size=<n>            每个 GPU 的批量大小。[默认: 32]
+
+两种命令模式 `tile` 和 `wsi`，用于进入相应的推理模式
+    tile  对图像块进行推理
+    wsi   对全切片图像进行推理
+
+使用 `run_infer.py <命令> --help` 查看各命令的选项和用法。
+"""
 
 tile_cli = """
 Arguments for processing tiles.
@@ -45,6 +74,25 @@ options:
    --draw_dot             To draw nuclei centroid on overlay. [default: False]
    --save_qupath          To optionally output QuPath v0.2.3 compatible format. [default: False]
    --save_raw_map         To save raw prediction or not. [default: False]
+"""
+# tile_cli 中文版
+tile_cli_cn = """
+处理图像块的参数。
+
+用法:
+    tile (--input_dir=<path>) (--output_dir=<path>) \
+         [--draw_dot] [--save_qupath] [--save_raw_map] [--mem_usage=<n>]
+    
+选项:
+   --input_dir=<path>     输入数据目录路径。假设文件没有嵌套在子目录中。
+   --output_dir=<path>    输出目录路径。
+
+   --mem_usage=<n>        指定用于缓存的内存（物理内存 + 交换空间）大小。
+                          默认情况下，它会加载尽可能多的图像块，直到达到声明的限制。
+                          [默认: 0.2]
+   --draw_dot             在叠加图上绘制细胞核质心。[默认: False]
+   --save_qupath          可选输出 QuPath v0.2.3 兼容格式。[默认: False]
+   --save_raw_map         是否保存原始预测结果。[默认: False]
 """
 
 wsi_cli = """
@@ -70,6 +118,30 @@ options:
     --save_thumb            To save thumb. [default: False]
     --save_mask             To save mask. [default: False]
 """
+# wsi_cli 中文版
+wsi_cli_cn = """
+处理全切片图像的参数
+
+用法:
+    wsi (--input_dir=<path>) (--output_dir=<path>) [--proc_mag=<n>]\
+        [--cache_path=<path>] [--input_mask_dir=<path>] \
+        [--ambiguous_size=<n>] [--chunk_shape=<n>] [--tile_shape=<n>] \
+        [--save_thumb] [--save_mask]
+    
+选项:
+    --input_dir=<path>      输入数据目录路径。假设文件没有嵌套在子目录中。
+    --output_dir=<path>     输出目录路径。
+    --cache_path=<path>     缓存路径。应放置在至少有 100GB 空间的 SSD 上。[默认: cache]
+    --mask_dir=<path>       包含组织掩码的目录路径。
+                            应与相应的 WSI 文件同名。[默认: '']
+
+    --proc_mag=<n>          WSI 处理使用的放大倍数（物镜倍率）。[默认: 40]
+    --ambiguous_size=<int>  定义沿分块网格的模糊区域，用于执行重后处理。[默认: 128]
+    --chunk_shape=<n>       处理时数据块的形状。[默认: 10000]
+    --tile_shape=<n>        处理时图像块的形状。[默认: 2048]
+    --save_thumb            是否保存缩略图。[默认: False]
+    --save_mask             是否保存掩码。[默认: False]
+"""
 
 import torch
 import logging
@@ -78,6 +150,7 @@ import copy
 from misc.utils import log_info
 from docopt import docopt
 
+#-------------------------------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------------------------------
 
 if __name__ == '__main__':
@@ -88,6 +161,7 @@ if __name__ == '__main__':
     sub_cmd_args = args.pop('<args>')
 
     # ! TODO: where to save logging
+    # ! TODO: 日志保存到哪里
     logging.basicConfig(
         level=logging.INFO,
         format='|%(asctime)s.%(msecs)03d| [%(levelname)s] %(message)s',datefmt='%Y-%m-%d|%H:%M:%S',
@@ -135,6 +209,7 @@ if __name__ == '__main__':
     }
 
     # ***
+    # ***
     run_args = {
         'batch_size' : int(args['batch_size']) * nr_gpus,
 
@@ -174,6 +249,7 @@ if __name__ == '__main__':
             'save_thumb'     : sub_args['save_thumb'],
             'save_mask'      : sub_args['save_mask'],
         })
+    # ***
     # ***
     
     if sub_cmd == 'tile':
